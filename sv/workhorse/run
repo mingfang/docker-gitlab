@@ -1,0 +1,12 @@
+#!/bin/bash
+
+sv start redis || exit 1
+sv start postgres || exit 1
+
+source /etc/envvars
+
+mkdir -p /home/git/repositories
+chown -R git:git /home/git/repositories
+
+exec 2>&1
+exec sudo -u git -H /home/git/gitlab-workhorse/gitlab-workhorse -listenUmask 0 -listenNetwork unix -listenAddr /home/git/gitlab/tmp/sockets/gitlab-workhorse.socket -authBackend http://127.0.0.1:8080 -authSocket /home/git/gitlab/tmp/sockets/gitlab.socket -documentRoot /home/git/gitlab/public

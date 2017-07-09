@@ -1,0 +1,25 @@
+#!/bin/bash
+
+sv start redis || exit 1
+
+source /etc/envvars
+
+if [ ! "$(ls -A ${PGDATA})" ]; then
+   mkdir -p ${PGDATA}
+   chown -R postgres ${PGDATA}
+   sudo -u postgres /usr/lib/postgresql/*/bin/initdb --locale en_US.UTF-8 -E UTF8 -D ${PGDATA}
+   sudo -u postgres /usr/lib/postgresql/*/bin/pg_ctl start -w -D ${PGDATA}
+   sudo -u postgres /usr/lib/postgresql/*/bin/psql -c "ALTER USER postgres PASSWORD 'postgres';"
+   if [ -f /ddl ]; then
+     sudo -u postgres psql -d template1 < /ddl
+   fi
+   pushd ~git/gitlab && echo "yes" | sudo -u git -H bundle exec rake gitlab:setup RAILS_ENV=production && popd
+   sudo -u postgres /usr/lib/postgresql/*/bin/pg_ctl stop -m smart -D ${PGDATA}
+   sed -i -e "s|#listen_addresses =.*|listen_addresses = '*'|" /usr/local/pgsql/data/postgresql.conf
+   echo "host  all  all 0.0.0.0/0 md5" >> /usr/local/pgsql/data/pg_hba.conf
+fi
+
+chown -R postgres ${PGDATA}
+
+exec 2>&1
+exec sudo -u postgres /usr/lib/postgresql/*/bin/postgres -D ${PGDATA}
